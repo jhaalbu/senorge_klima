@@ -64,17 +64,17 @@ def klima_dataframe(lat, lon, startdato, sluttdato):
     Returns
         df (dataframe): Returnerer ei pandas dataframe
     """
-    bar = st.progress(0)
+    #bar = st.progress(0)
     rr = nve_api(lat, lon, startdato, sluttdato, 'rr') #Nedbør døgn
-    bar.progress(20)
+    #bar.progress(20)
     fsw = nve_api(lat, lon, startdato, sluttdato, 'fsw') #Nysnø døgn
-    bar.progress(40)
+    #bar.progress(40)
     sdfsw3d = nve_api(lat, lon, startdato, sluttdato, 'sdfsw3d') #Nynsø 3 døgn
-    bar.progress(60)
+    #bar.progress(60)
     sd = nve_api(lat, lon, startdato, sluttdato, 'sd') #Snødybde
-    bar.progress(80)
+    #bar.progress(80)
     tm = nve_api(lat, lon, startdato, sluttdato, 'tm') #Døgntemperatur
-    bar.progress(100)
+    #bar.progress(100)
     start = datetime.datetime(int(startdato[0:4]), int(startdato[5:7]), int(startdato[8:10]))#'1960-01-01' 
     end = datetime.datetime(int(sluttdato[0:4]), int(sluttdato[5:7]), int(sluttdato[8:10]))
     #Etablerer pandas dataframe frå rr liste
@@ -131,19 +131,55 @@ def plot_normaler(df, ax1=None):
 
     return ax1, ax2
 
+def plot_snomengde(df, ax1=None):
+    dag = df['sd'].groupby(df.index.strftime('%m-%d')).mean()
+    dag_sd_df = dag.to_frame()
+    dagtm = df['tm'].groupby(df.index.strftime('%m-%d')).mean()
+    dag_tm_df = dagtm.to_frame()
+    dag_tm_df['tm_min'] = df['tm'].groupby(df.index.strftime('%m-%d')).min()
+    dag_tm_df['tm_max'] = df['tm'].groupby(df.index.strftime('%m-%d')).max()
+    dag_sd_df['sd_max'] = df['sd'].groupby(df.index.strftime('%m-%d')).max()
+    dag_sd_df['sd_min'] = df['sd'].groupby(df.index.strftime('%m-%d')).min()
+
+    if ax1 is None:
+        ax1 = plt.gca()
+    
+    ax1.plot(dag_sd_df.index, dag_sd_df['sd'], label='Snitt snømengde')
+    ax1.plot(dag_sd_df.index, dag_sd_df['sd_max'], label='Max snømengde')
+    ax1.plot(dag_sd_df.index, dag_sd_df['sd_min'], label='Min snømengde')
+    ax1.xaxis.set_major_locator(MultipleLocator(32))
+    #ax1.xaxis.set_major_formatter(FormatStrFormatter('%m'))
+    ax1.set_title('Snømengde  ' + startdato[0:4] + ' til ' + sluttdato[0:4])
+    ax1.set_xlabel('Dag i året (måned-dag)')
+    ax1.set_ylabel('Snøhøgde (cm)')
+    ax1.legend()
+
+    ax2 = ax1.twinx()
+    ax2.plot(dag_tm_df.index, dag_tm_df['tm'], 'r--', label='Gjennomsnittstemperatur')
+    ax2.xaxis.set_major_locator(MultipleLocator(32))
+    ax2.legend(loc='lower left')
+    ax2.set_ylim(dag_tm_df['tm'].min()-5, dag_tm_df['tm'].max()+5)
+    ax2.axhline(0, linestyle='--', color='grey', linewidth=0.5)
+    ax2.set_ylabel(u'Temperatur (\u00B0C)')
+
+    return ax1, ax2
+
+
 st.title('AV-Klima')
 st.write("Test av klimadata streamlit")
 
 #Gi in kordinater for posisjon og start og sluttdato for dataserien.
-lon = st.text_input("Gi NORD koordinat")
+lon = st.text_input("Gi NORD koordinat", 6822565)
 #lon = 6822565  #Y
-lat = st.text_input("Gi ØST koordinat")
+lat = st.text_input("Gi ØST koordinat", 67070)
 #lat = 67070      #X
+knapp = st.button('Vis plot')
 
-if lat and lon:
+if knapp:
+    bar = st.progress(0)
     transformer = Transformer.from_crs(5973, 4326)
     trans_x, trans_y =  transformer.transform(lat, lon)
-
+    bar.progress(20)
     m = folium.Map(location=[trans_x, trans_y], zoom_start=10) #Bruker transformerte koordinater (ikkej funne ut korleis bruke UTM med folium)
     folium.Circle(
         radius=1000,
@@ -163,14 +199,22 @@ if lat and lon:
         
     ).add_to(m)
     folium_static(m)
-
+    bar.progress(30)
     df = klima_dataframe(lat, lon, startdato, sluttdato) 
-    st.write(df)
+    #st.write(df)
 
 
     fig, ax = plt.subplots(1)
+    bar.progress(50)
     ax1, ax2 = plot_normaler(df)
+    bar.progress(60)
+    st.write(fig)
+    bar.progress(100)
 
+    fig, ax = plt.subplots(1)
+    bar.progress(50)
+    ax1, ax2 = plot_snomengde(df)
+    bar.progress(60)
     st.write(fig)
 #plot_something(data1, ax1, color='blue')
 #plot_something(data2, ax2, color='red')
